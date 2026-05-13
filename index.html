@@ -1,0 +1,1943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GAIP 2026 with ESS — Insurance Command Center</title>
+
+  <!-- Pretendard -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+  <!-- IBM Plex Mono for numerics -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" />
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- D3 (radar) -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <!-- PapaParse (CSV) -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    /* ============================================================
+       AUTHKIT MIDNIGHT COMMAND CENTER — design tokens
+       ============================================================ */
+    :root {
+      --color-midnight-abyss: #05060f;
+      --color-midnight-deep:  #0a0c1a;
+      --color-midnight-card:  #11142a;
+      --color-ghost-white: #ffffff;
+      --color-comet: #d8ecf8;
+      --color-arctic-mist: #d1e4fa;
+      --color-celestial-light: #b6d9fc;
+      --color-azure-glow: #c7d3ea;
+      --color-slate-dew: #3f4959;
+      --color-whisper-blue: #9da7ba;
+      --color-neon-violet: #663af3;
+      --color-neon-violet-soft: rgba(102,58,243,0.42);
+      --color-interstellar-gray: #81899b;
+
+      --color-status-normal:   #b6d9fc;
+      --color-status-warning:  #f7c76d;
+      --color-status-critical: #f76d6d;
+      --color-status-normal-glow:   rgba(182,217,252,0.32);
+      --color-status-warning-glow:  rgba(247,199,109,0.36);
+      --color-status-critical-glow: rgba(247,109,109,0.40);
+
+      --shadow-subtle:    rgba(186,215,247,0.12) 0px 0px 0px 1px inset;
+      --shadow-glassy:    inset rgba(199,211,234,0.12) 0 1px 1px,
+                          inset rgba(199,211,234,0.05) 0 24px 48px,
+                          rgba(6,6,14,0.7) 0 24px 32px;
+      --shadow-login:     inset rgba(216,236,248,0.2) 0 1px 1px,
+                          inset rgba(168,216,245,0.06) 0 24px 48px,
+                          rgba(0,0,0,0.3) 0 16px 32px;
+      --shadow-glow-icon: rgba(186,207,247,0.32) 0 0 6px;
+      --shadow-glow-cta:  rgba(238,186,247,0.24) 0 0 12px;
+
+      --radius-sm: 10px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-pill: 999px;
+
+      --font-display: 'Pretendard', 'Space Grotesk', -apple-system, sans-serif;
+      --font-body:    'Pretendard', -apple-system, sans-serif;
+      --font-mono:    'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+
+      --duration-quick: 200ms;
+      --duration-normal: 400ms;
+      --duration-slow: 700ms;
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      font-family: var(--font-body);
+      color: var(--color-comet);
+      background: var(--color-midnight-abyss);
+    }
+
+    body {
+      background:
+        radial-gradient(ellipse at 50% -20%, rgba(102,58,243,0.18) 0%, transparent 55%),
+        radial-gradient(ellipse at 100% 100%, rgba(182,217,252,0.08) 0%, transparent 60%),
+        var(--color-midnight-abyss);
+      background-attachment: fixed;
+      letter-spacing: -0.005em;
+    }
+
+    /* ----- State container — only one state visible at a time ----- */
+    .state {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow-y: auto;
+    }
+    .state.active { display: flex; }
+    /* Dashboard uses block flow so content stacks from the top and the
+       state container becomes the scroll viewport. */
+    #state-dashboard.active {
+      display: block;
+      padding: 0;
+      align-items: initial;
+      justify-content: initial;
+    }
+
+    /* ============================================================
+       STATE 1 — SPLASH
+       ============================================================ */
+    #state-splash {
+      flex-direction: column;
+      gap: 20px;
+      animation: splashIn 800ms var(--ease-out);
+    }
+    .splash-hero {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: clamp(36px, 5.5vw, 56px);
+      color: var(--color-ghost-white);
+      letter-spacing: -0.025em;
+      text-align: center;
+      line-height: 1.1;
+    }
+    .splash-hero .accent-ess {
+      transition: color 600ms var(--ease-out), text-shadow 600ms var(--ease-out);
+    }
+    .splash-hero .accent-ml {
+      transition: color 600ms var(--ease-out), text-shadow 600ms var(--ease-out);
+    }
+    .splash-hero.lit .accent-ess {
+      color: var(--color-celestial-light);
+      text-shadow: 0 0 24px rgba(182,217,252,0.55);
+    }
+    .splash-hero.lit .accent-ml {
+      color: var(--color-neon-violet);
+      text-shadow: 0 0 24px rgba(102,58,243,0.65);
+    }
+    .splash-sub {
+      font-family: var(--font-display);
+      font-weight: 400;
+      font-size: clamp(18px, 2.4vw, 26px);
+      color: var(--color-arctic-mist);
+      letter-spacing: 0.02em;
+      text-align: center;
+      opacity: 0.85;
+    }
+    @keyframes splashIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes splashOut {
+      from { opacity: 1; }
+      to   { opacity: 0; }
+    }
+
+    /* ============================================================
+       STATE 2 — TUTORIAL PROMPT
+       ============================================================ */
+    .glassy-card {
+      background: linear-gradient(180deg, rgba(17,20,42,0.92) 0%, rgba(10,12,26,0.92) 100%);
+      border: 1px solid rgba(186,217,252,0.10);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-glassy);
+      padding: 48px;
+      max-width: 540px;
+      width: 100%;
+      backdrop-filter: blur(20px);
+    }
+    .prompt-title {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 24px;
+      color: var(--color-ghost-white);
+      text-align: center;
+      letter-spacing: -0.015em;
+      margin-bottom: 8px;
+    }
+    .prompt-sub {
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: 15px;
+      color: var(--color-arctic-mist);
+      text-align: center;
+      margin-bottom: 28px;
+      opacity: 0.78;
+    }
+    .prompt-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: stretch;
+    }
+    .btn-primary {
+      font-family: var(--font-body);
+      font-weight: 500;
+      font-size: 15px;
+      color: var(--color-ghost-white);
+      background: var(--color-neon-violet);
+      border: none;
+      border-radius: var(--radius-pill);
+      padding: 14px 20px;
+      cursor: pointer;
+      transition: transform var(--duration-quick) var(--ease-out),
+                  box-shadow var(--duration-quick) var(--ease-out);
+      box-shadow: var(--shadow-glow-cta);
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: rgba(238,186,247,0.42) 0 0 18px,
+                  rgba(102,58,243,0.30) 0 6px 16px;
+    }
+    .btn-secondary {
+      font-family: var(--font-body);
+      font-weight: 500;
+      font-size: 15px;
+      color: var(--color-comet);
+      background: transparent;
+      border: 1px solid rgba(186,217,252,0.22);
+      border-radius: var(--radius-pill);
+      padding: 14px 20px;
+      cursor: pointer;
+      transition: border-color var(--duration-quick) var(--ease-out),
+                  background var(--duration-quick) var(--ease-out);
+    }
+    .btn-secondary:hover {
+      border-color: var(--color-celestial-light);
+      background: rgba(182,217,252,0.06);
+    }
+
+    /* ============================================================
+       STATE 3 — TUTORIAL (overlay finger pointer + caption)
+       ============================================================ */
+    #tutorial-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      display: none;
+    }
+    #tutorial-overlay.active { display: block; pointer-events: auto; }
+    #tutorial-overlay .dim {
+      position: absolute;
+      inset: 0;
+      background: rgba(5,6,15,0.72);
+      pointer-events: none;
+    }
+    #tutorial-finger {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      filter: drop-shadow(0 4px 14px rgba(186,217,252,0.55));
+      transition: top 800ms var(--ease-out), left 800ms var(--ease-out),
+                  transform 800ms var(--ease-out);
+      pointer-events: none;
+      z-index: 10001;
+    }
+    #tutorial-caption {
+      position: absolute;
+      max-width: 360px;
+      background: linear-gradient(180deg, rgba(17,20,42,0.96) 0%, rgba(10,12,26,0.96) 100%);
+      border: 1px solid var(--color-celestial-light);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-glassy);
+      padding: 18px 22px;
+      transition: top 800ms var(--ease-out), left 800ms var(--ease-out);
+      z-index: 10000;
+    }
+    #tutorial-caption .step-no {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-celestial-light);
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+    }
+    #tutorial-caption .step-text {
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: var(--color-comet);
+      line-height: 1.45;
+    }
+    #tutorial-controls {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      display: flex;
+      gap: 8px;
+      z-index: 10002;
+    }
+    .tut-btn {
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--color-comet);
+      background: rgba(17,20,42,0.92);
+      border: 1px solid rgba(186,217,252,0.22);
+      border-radius: var(--radius-pill);
+      padding: 8px 14px;
+      cursor: pointer;
+      transition: border-color var(--duration-quick);
+    }
+    .tut-btn:hover { border-color: var(--color-celestial-light); }
+    .tut-spotlight {
+      position: absolute;
+      border: 2px solid var(--color-celestial-light);
+      border-radius: var(--radius-md);
+      box-shadow: 0 0 0 9999px rgba(5,6,15,0.7),
+                  0 0 30px var(--color-status-normal-glow);
+      pointer-events: none;
+      transition: top 800ms var(--ease-out), left 800ms var(--ease-out),
+                  width 800ms var(--ease-out), height 800ms var(--ease-out);
+      z-index: 9998;
+    }
+
+    /* ============================================================
+       STATE 4 — LOGIN
+       ============================================================ */
+    #state-login .login-card { max-width: 440px; }
+    .login-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 22px;
+      color: var(--color-ghost-white);
+      text-align: center;
+      margin-bottom: 6px;
+    }
+    .login-sub {
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: var(--color-arctic-mist);
+      text-align: center;
+      margin-bottom: 28px;
+      opacity: 0.78;
+    }
+    .field {
+      margin-bottom: 16px;
+    }
+    .field label {
+      display: block;
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--color-arctic-mist);
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+    .field input {
+      width: 100%;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--color-ghost-white);
+      background: rgba(5,6,15,0.6);
+      border: 1px solid rgba(186,217,252,0.18);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      transition: border-color var(--duration-quick);
+    }
+    .field input::placeholder { color: var(--color-whisper-blue); }
+    .field input:focus {
+      outline: none;
+      border-color: var(--color-celestial-light);
+      box-shadow: 0 0 0 3px rgba(182,217,252,0.12);
+    }
+    .field .hint {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-interstellar-gray);
+      margin-top: 6px;
+    }
+    .login-error {
+      display: none;
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--color-status-critical);
+      text-align: center;
+      margin-top: 12px;
+    }
+    .login-error.show {
+      display: block;
+      animation: shake 350ms;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-6px); }
+      40% { transform: translateX(6px); }
+      60% { transform: translateX(-4px); }
+      80% { transform: translateX(4px); }
+    }
+
+    /* ============================================================
+       STATE 5 — DASHBOARD
+       ============================================================ */
+    #state-dashboard {
+      flex-direction: column;
+      gap: 0;
+    }
+    .dashboard-wrapper {
+      width: 100%;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px 32px 40px;
+    }
+
+    /* ----- Header ----- */
+    .dash-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(5,6,15,0.85);
+      backdrop-filter: blur(18px);
+      border-bottom: 1px solid rgba(186,217,252,0.10);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .brand {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--color-ghost-white);
+      letter-spacing: -0.01em;
+    }
+    .brand .brand-sub {
+      font-family: var(--font-mono);
+      font-weight: 400;
+      font-size: 11px;
+      color: var(--color-celestial-light);
+      letter-spacing: 0.10em;
+      margin-left: 12px;
+      text-transform: uppercase;
+    }
+    .view-toggle {
+      display: flex;
+      background: rgba(17,20,42,0.6);
+      border: 1px solid rgba(186,217,252,0.14);
+      border-radius: var(--radius-pill);
+      padding: 4px;
+    }
+    .view-toggle button {
+      font-family: var(--font-body);
+      font-weight: 500;
+      font-size: 13px;
+      color: var(--color-arctic-mist);
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-pill);
+      padding: 8px 18px;
+      cursor: pointer;
+      transition: all var(--duration-quick);
+    }
+    .view-toggle button.active {
+      color: var(--color-ghost-white);
+      background: var(--color-neon-violet);
+      box-shadow: var(--shadow-glow-cta);
+    }
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .header-date {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--color-arctic-mist);
+      padding: 8px 14px;
+      background: rgba(17,20,42,0.6);
+      border: 1px solid rgba(186,217,252,0.14);
+      border-radius: var(--radius-sm);
+    }
+
+    /* ----- Date scrubber row ----- */
+    .scrubber-row {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 18px 0 28px;
+    }
+    .scrubber-controls {
+      display: flex;
+      gap: 6px;
+    }
+    .scrub-btn {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(17,20,42,0.7);
+      border: 1px solid rgba(186,217,252,0.14);
+      border-radius: var(--radius-sm);
+      color: var(--color-comet);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      cursor: pointer;
+      transition: border-color var(--duration-quick);
+    }
+    .scrub-btn:hover { border-color: var(--color-celestial-light); }
+    .scrub-btn.play { background: var(--color-neon-violet); color: var(--color-ghost-white); border-color: transparent; }
+    #scrubber {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      background: linear-gradient(to right, var(--color-neon-violet) 0%, var(--color-neon-violet) var(--scrub-pct, 50%), rgba(186,217,252,0.10) var(--scrub-pct, 50%), rgba(186,217,252,0.10) 100%);
+      border-radius: var(--radius-pill);
+      outline: none;
+      cursor: pointer;
+    }
+    #scrubber::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      background: var(--color-celestial-light);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--color-status-normal-glow);
+      cursor: pointer;
+    }
+    #scrubber::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      background: var(--color-celestial-light);
+      border-radius: 50%;
+      border: none;
+      box-shadow: 0 0 10px var(--color-status-normal-glow);
+      cursor: pointer;
+    }
+
+    /* ----- KPI cards ----- */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .kpi-card {
+      background: linear-gradient(180deg, rgba(17,20,42,0.85) 0%, rgba(10,12,26,0.85) 100%);
+      border: 1px solid rgba(186,217,252,0.10);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      box-shadow: var(--shadow-subtle);
+      transition: transform var(--duration-quick) var(--ease-out),
+                  border-color var(--duration-quick);
+    }
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(186,217,252,0.22);
+    }
+    .kpi-label {
+      font-family: var(--font-body);
+      font-size: 11px;
+      color: var(--color-interstellar-gray);
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .kpi-value {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      font-size: 30px;
+      color: var(--color-ghost-white);
+      letter-spacing: -0.01em;
+      line-height: 1.0;
+    }
+    .kpi-trend {
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--color-celestial-light);
+      margin-top: 8px;
+    }
+    .kpi-trend.up { color: var(--color-status-warning); }
+    .kpi-trend.down { color: var(--color-status-normal); }
+
+    /* ----- Chart panels ----- */
+    .panel {
+      background: linear-gradient(180deg, rgba(17,20,42,0.85) 0%, rgba(10,12,26,0.85) 100%);
+      border: 1px solid rgba(186,217,252,0.10);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      box-shadow: var(--shadow-subtle);
+      margin-bottom: 20px;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .panel-title {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--color-ghost-white);
+      letter-spacing: 0.01em;
+    }
+    .panel-sub {
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--color-interstellar-gray);
+      margin-top: 2px;
+    }
+    .freq-toggle {
+      display: flex;
+      background: rgba(5,6,15,0.5);
+      border: 1px solid rgba(186,217,252,0.10);
+      border-radius: var(--radius-pill);
+      padding: 3px;
+    }
+    .freq-toggle button {
+      font-family: var(--font-body);
+      font-size: 11px;
+      color: var(--color-arctic-mist);
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-pill);
+      padding: 5px 12px;
+      cursor: pointer;
+    }
+    .freq-toggle button.active {
+      background: rgba(102,58,243,0.32);
+      color: var(--color-ghost-white);
+    }
+    #premiumChart, #premiumIndChart {
+      width: 100% !important;
+      height: 280px !important;
+    }
+
+    /* ----- Side-by-side panels (radar + drivers) ----- */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .radar-svg {
+      width: 100%;
+      height: 280px;
+    }
+    .drivers-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .driver-row {
+      display: grid;
+      grid-template-columns: 24px 1fr auto;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 16px;
+      background: rgba(5,6,15,0.42);
+      border: 1px solid rgba(186,217,252,0.08);
+      border-radius: var(--radius-sm);
+    }
+    .driver-rank {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--color-celestial-light);
+    }
+    .driver-name {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--color-ghost-white);
+    }
+    .driver-value {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--color-status-warning);
+    }
+
+    /* ----- Counterfactual ----- */
+    .counterfactual {
+      display: grid;
+      grid-template-columns: 1fr 200px;
+      gap: 24px;
+      align-items: center;
+    }
+    .cf-slider-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .cf-slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--color-arctic-mist);
+    }
+    .cf-slider-label span.value {
+      font-family: var(--font-mono);
+      color: var(--color-ghost-white);
+    }
+    #cfSlider {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      background: linear-gradient(to right, var(--color-neon-violet) 0%, var(--color-neon-violet) var(--cf-pct, 50%), rgba(186,217,252,0.10) var(--cf-pct, 50%), rgba(186,217,252,0.10) 100%);
+      border-radius: var(--radius-pill);
+      outline: none;
+    }
+    #cfSlider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px; height: 18px;
+      background: var(--color-celestial-light);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .cf-result {
+      text-align: center;
+      padding: 18px;
+      background: rgba(102,58,243,0.10);
+      border: 1px solid rgba(102,58,243,0.32);
+      border-radius: var(--radius-md);
+    }
+    .cf-result .delta {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      font-size: 24px;
+      color: var(--color-status-normal);
+    }
+    .cf-result .delta.up { color: var(--color-status-warning); }
+    .cf-result .label {
+      font-family: var(--font-body);
+      font-size: 11px;
+      color: var(--color-arctic-mist);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-top: 6px;
+    }
+
+    /* ============================================================
+       INDIVIDUAL VIEW — ESS cards
+       ============================================================ */
+    .ess-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .ess-card {
+      background: linear-gradient(180deg, rgba(17,20,42,0.92) 0%, rgba(10,12,26,0.92) 100%);
+      border: 1px solid rgba(186,217,252,0.10);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      cursor: pointer;
+      transition: transform var(--duration-quick), border-color var(--duration-quick);
+      position: relative;
+      overflow: hidden;
+    }
+    .ess-card:hover { transform: translateY(-3px); border-color: rgba(186,217,252,0.32); }
+    .ess-card.selected { border-color: var(--color-celestial-light); box-shadow: 0 0 0 1px var(--color-celestial-light), 0 12px 24px rgba(0,0,0,0.4); }
+    .ess-card .id {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-interstellar-gray);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .ess-card .name {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--color-ghost-white);
+      margin-top: 4px;
+      margin-bottom: 14px;
+      line-height: 1.3;
+    }
+    .ess-card .status-pill {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      font-size: 10px;
+      letter-spacing: 0.10em;
+      padding: 5px 10px;
+      border-radius: var(--radius-pill);
+      margin-bottom: 14px;
+    }
+    .ess-card .status-pill.NORMAL {
+      background: rgba(182,217,252,0.14);
+      color: var(--color-status-normal);
+      box-shadow: 0 0 12px var(--color-status-normal-glow);
+    }
+    .ess-card .status-pill.WARNING {
+      background: rgba(247,199,109,0.16);
+      color: var(--color-status-warning);
+      box-shadow: 0 0 12px var(--color-status-warning-glow);
+    }
+    .ess-card .status-pill.CRITICAL {
+      background: rgba(247,109,109,0.18);
+      color: var(--color-status-critical);
+      box-shadow: 0 0 14px var(--color-status-critical-glow);
+      animation: pulseCritical 1.6s infinite var(--ease-out);
+    }
+    @keyframes pulseCritical {
+      0%, 100% { opacity: 0.92; }
+      50% { opacity: 0.65; }
+    }
+    .ess-card .stat {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-body);
+      font-size: 11px;
+      color: var(--color-arctic-mist);
+      margin-top: 6px;
+    }
+    .ess-card .stat .v {
+      font-family: var(--font-mono);
+      color: var(--color-ghost-white);
+    }
+
+    /* Detail panel */
+    .ess-detail {
+      background: linear-gradient(180deg, rgba(17,20,42,0.85) 0%, rgba(10,12,26,0.85) 100%);
+      border: 1px solid rgba(186,217,252,0.10);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      box-shadow: var(--shadow-subtle);
+    }
+    .ess-detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .ess-detail-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--color-ghost-white);
+    }
+    .ess-detail-sub {
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--color-arctic-mist);
+      margin-top: 2px;
+    }
+    .ess-recommendations {
+      margin-top: 18px;
+      padding: 18px;
+      background: rgba(5,6,15,0.42);
+      border-left: 3px solid var(--color-celestial-light);
+      border-radius: var(--radius-sm);
+    }
+    .ess-recommendations h4 {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--color-celestial-light);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .ess-recommendations ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .ess-recommendations li {
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--color-comet);
+      padding: 6px 0;
+      padding-left: 22px;
+      position: relative;
+      line-height: 1.5;
+    }
+    .ess-recommendations li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: var(--color-celestial-light);
+      font-family: var(--font-mono);
+    }
+
+    /* ----- View visibility ----- */
+    .view-content { display: none; }
+    .view-content.active { display: block; }
+
+    /* ----- Animation: stagger card entrance ----- */
+    .stagger-in > * {
+      opacity: 0;
+      transform: translateY(10px);
+      animation: staggerIn 600ms var(--ease-out) forwards;
+    }
+    .stagger-in > *:nth-child(1) { animation-delay: 50ms; }
+    .stagger-in > *:nth-child(2) { animation-delay: 100ms; }
+    .stagger-in > *:nth-child(3) { animation-delay: 150ms; }
+    .stagger-in > *:nth-child(4) { animation-delay: 200ms; }
+    .stagger-in > *:nth-child(5) { animation-delay: 250ms; }
+    @keyframes staggerIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ----- Footer hint ----- */
+    .footer-hint {
+      position: fixed;
+      bottom: 16px;
+      right: 24px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-interstellar-gray);
+      background: rgba(5,6,15,0.6);
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(186,217,252,0.08);
+      z-index: 50;
+    }
+
+    /* Loading state */
+    .loading {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--color-arctic-mist);
+      text-align: center;
+      padding: 60px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============================================================
+       STATE 1 — SPLASH
+       ============================================================ -->
+  <div id="state-splash" class="state active">
+    <h1 class="splash-hero">
+      <span class="accent-ess">ESS</span>
+      Insurance using
+      <span class="accent-ml">Machine Learning</span>
+    </h1>
+    <p class="splash-sub">in GAIP 2026</p>
+  </div>
+
+  <!-- ============================================================
+       STATE 2 — TUTORIAL PROMPT
+       ============================================================ -->
+  <div id="state-prompt" class="state">
+    <div class="glassy-card">
+      <h2 class="prompt-title">Welcome to GAIP 2026 with ESS</h2>
+      <p class="prompt-sub">Would you like a guided tour of the dashboard?</p>
+      <div class="prompt-actions">
+        <button class="btn-primary" id="btnYesTutorial">Yes — Show me</button>
+        <button class="btn-secondary" id="btnSkipTutorial">No — Skip to login</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       STATE 4 — LOGIN
+       ============================================================ -->
+  <div id="state-login" class="state">
+    <div class="glassy-card login-card">
+      <h2 class="login-title">GAIP 2026 with ESS</h2>
+      <p class="login-sub">Sign in to your insurance command center</p>
+
+      <div class="field">
+        <label for="loginId">User ID</label>
+        <input type="text" id="loginId" placeholder="Enter ID" autocomplete="off" />
+        <div class="hint">Demo credentials: ID = GAIP</div>
+      </div>
+
+      <div class="field">
+        <label for="loginPw">Password</label>
+        <input type="password" id="loginPw" placeholder="Enter password" autocomplete="off" />
+        <div class="hint">Demo credentials: Password = 2026</div>
+      </div>
+
+      <button class="btn-primary" id="btnSignIn" style="width:100%; margin-top:8px;">Sign In</button>
+
+      <div class="login-error" id="loginError">Invalid credentials. Try ID = GAIP, Password = 2026.</div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       STATE 5 — DASHBOARD
+       ============================================================ -->
+  <div id="state-dashboard" class="state">
+    <header class="dash-header">
+      <div class="brand">
+        GAIP 2026 with ESS
+        <span class="brand-sub">Insurance Command Center</span>
+      </div>
+      <div class="view-toggle">
+        <button id="vtAggregated" class="active">Aggregated</button>
+        <button id="vtIndividual">Individual</button>
+      </div>
+      <div class="header-controls">
+        <span class="header-date" id="headerDate">—</span>
+        <button class="btn-secondary" id="btnReplayTut" style="padding:8px 14px; font-size:12px;">↻ Tutorial</button>
+      </div>
+    </header>
+
+    <div class="dashboard-wrapper">
+
+      <!-- Date scrubber -->
+      <div class="scrubber-row">
+        <div class="scrubber-controls">
+          <button class="scrub-btn" id="btnScrubBack">◀</button>
+          <button class="scrub-btn play" id="btnScrubPlay">▶</button>
+          <button class="scrub-btn" id="btnScrubForward">▶</button>
+        </div>
+        <input type="range" id="scrubber" min="0" max="364" value="364" step="1" />
+        <span class="header-date" id="scrubberDate" style="min-width:140px; text-align:center;">—</span>
+      </div>
+
+      <!-- ================= AGGREGATED VIEW ================= -->
+      <div class="view-content active" id="viewAggregated">
+        <!-- KPI cards -->
+        <div class="kpi-grid stagger-in">
+          <div class="kpi-card" id="kpiPortfolioPrem">
+            <div class="kpi-label">Portfolio premium / week</div>
+            <div class="kpi-value">$ <span id="kpiPortfolioVal">—</span></div>
+            <div class="kpi-trend" id="kpiPortfolioTrend">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Avg per-system / week</div>
+            <div class="kpi-value">$ <span id="kpiAvgVal">—</span></div>
+            <div class="kpi-trend" id="kpiAvgTrend">95% CI ±—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Fleet aggregate risk</div>
+            <div class="kpi-value"><span id="kpiRiskVal">—</span></div>
+            <div class="kpi-trend" id="kpiRiskStatus">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Avg state of health</div>
+            <div class="kpi-value"><span id="kpiSohVal">—</span><span style="font-size:18px; color:var(--color-arctic-mist);">%</span></div>
+            <div class="kpi-trend" id="kpiSohTrend">—</div>
+          </div>
+        </div>
+
+        <!-- Premium timeline -->
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Portfolio Premium Timeline</div>
+              <div class="panel-sub">Daily aggregate; envelope = 95% credible interval</div>
+            </div>
+            <div class="freq-toggle">
+              <button data-freq="daily" class="active">Daily</button>
+              <button data-freq="weekly">Weekly</button>
+              <button data-freq="monthly">Monthly</button>
+            </div>
+          </div>
+          <canvas id="premiumChart"></canvas>
+        </div>
+
+        <!-- Two columns: radar + top drivers -->
+        <div class="two-col">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">5-Precursor Risk Radar</div>
+                <div class="panel-sub">Fleet-relative z-scores (today vs 30-day envelope)</div>
+              </div>
+            </div>
+            <svg class="radar-svg" id="radarSvg"></svg>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Top 3 Risk Drivers</div>
+                <div class="panel-sub">Strongest precursor contributions today</div>
+              </div>
+            </div>
+            <div class="drivers-list" id="driversList"></div>
+          </div>
+        </div>
+
+        <!-- Counterfactual -->
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Behavioural Counterfactual</div>
+              <div class="panel-sub">Tighten the SOC envelope and watch your premium drop next week</div>
+            </div>
+          </div>
+          <div class="counterfactual">
+            <div class="cf-slider-wrap">
+              <div class="cf-slider-label">
+                <span>Maximum allowed SOC</span>
+                <span class="value"><span id="cfValue">95</span>%</span>
+              </div>
+              <input type="range" id="cfSlider" min="80" max="98" value="95" step="1" />
+            </div>
+            <div class="cf-result">
+              <div class="delta" id="cfDelta">−0%</div>
+              <div class="label">predicted weekly premium change</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= INDIVIDUAL VIEW ================= -->
+      <div class="view-content" id="viewIndividual">
+        <div class="ess-grid stagger-in" id="essGrid">
+          <!-- cards filled by JS -->
+        </div>
+
+        <div class="ess-detail" id="essDetail" style="display:none;">
+          <div class="ess-detail-header">
+            <div>
+              <div class="ess-detail-title" id="detailTitle">—</div>
+              <div class="ess-detail-sub" id="detailSub">—</div>
+            </div>
+            <span class="status-pill" id="detailStatus" style="font-family:var(--font-mono); font-weight:600; font-size:11px; padding:6px 14px; border-radius:999px;">—</span>
+          </div>
+
+          <div class="kpi-grid" style="margin-bottom: 20px;">
+            <div class="kpi-card">
+              <div class="kpi-label">Weekly premium</div>
+              <div class="kpi-value">$ <span id="detailPrem">—</span></div>
+              <div class="kpi-trend" id="detailPremCi">95% CI ±—</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">P(fire / 7-day)</div>
+              <div class="kpi-value" style="font-size: 22px;"><span id="detailPfire">—</span></div>
+              <div class="kpi-trend">Tower A posterior</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">SOH</div>
+              <div class="kpi-value"><span id="detailSoh">—</span><span style="font-size:18px;">%</span></div>
+              <div class="kpi-trend" id="detailSohTrend">—</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Aggregate s_x</div>
+              <div class="kpi-value"><span id="detailSx">—</span></div>
+              <div class="kpi-trend" id="detailSxStatus">—</div>
+            </div>
+          </div>
+
+          <div class="two-col">
+            <div class="panel" style="margin-bottom: 0;">
+              <div class="panel-header">
+                <div>
+                  <div class="panel-title">365-day premium history</div>
+                  <div class="panel-sub">Weekly premium trajectory</div>
+                </div>
+              </div>
+              <canvas id="premiumIndChart"></canvas>
+            </div>
+            <div class="panel" style="margin-bottom: 0;">
+              <div class="panel-header">
+                <div>
+                  <div class="panel-title">Top 3 drivers (this system, today)</div>
+                  <div class="panel-sub">Sorted by absolute precursor contribution</div>
+                </div>
+              </div>
+              <div class="drivers-list" id="detailDrivers"></div>
+            </div>
+          </div>
+
+          <div class="ess-recommendations">
+            <h4>Recommended actions</h4>
+            <ul id="detailRecs"></ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="footer-hint">Build • GAIP 2026 with ESS • demo data — proxy CSV in /dashboard/data</div>
+  </div>
+
+  <!-- Tutorial overlay -->
+  <div id="tutorial-overlay">
+    <div class="dim"></div>
+    <div class="tut-spotlight" id="tutSpotlight" style="display:none;"></div>
+    <svg id="tutorial-finger" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="display:none;">
+      <path d="M32 4C20 4 14 14 14 22v18l-4-2c-3-1-6 1-6 4 0 1 0 2 1 3l10 14c2 3 6 5 10 5h12c8 0 14-6 14-14V22c0-8-6-18-19-18z"
+            fill="rgba(216,236,248,0.95)" stroke="rgba(102,58,243,0.85)" stroke-width="1.5" />
+    </svg>
+    <div id="tutorial-caption" style="display:none;">
+      <div class="step-no" id="tutStepNo">STEP 1</div>
+      <div class="step-text" id="tutStepText">—</div>
+    </div>
+  </div>
+  <div id="tutorial-controls" style="display:none;">
+    <button class="tut-btn" id="btnTutNext">Next →</button>
+    <button class="tut-btn" id="btnTutSkip">Skip Tutorial</button>
+  </div>
+
+  <script>
+    /* ============================================================
+       APP STATE
+       ============================================================ */
+    const APP = {
+      data: null,                 // PapaParse parsed CSV data
+      systems: [],                // [{id, name, days: [...]}]
+      dates: [],                  // ['2025-05-01', ...]
+      currentDayIdx: 0,
+      currentView: 'aggregated',
+      selectedSystemId: null,
+      premiumChart: null,
+      premiumIndChart: null,
+      playInterval: null,
+      cfBaselinePremium: 0,
+    };
+
+    /* ============================================================
+       STATE MACHINE
+       ============================================================ */
+    const StateMachine = {
+      go(name) {
+        document.querySelectorAll('.state').forEach(el => el.classList.remove('active'));
+        document.getElementById('state-' + name).classList.add('active');
+        if (name === 'dashboard') initDashboard();
+      }
+    };
+
+    /* ============================================================
+       SPLASH SEQUENCE
+       ============================================================ */
+    function runSplash() {
+      const hero = document.querySelector('.splash-hero');
+      // Trigger color highlights at 1.2s
+      setTimeout(() => hero.classList.add('lit'), 1200);
+      // Move to next state at 3.0s
+      setTimeout(() => {
+        document.getElementById('state-splash').style.animation = 'splashOut 500ms forwards';
+        setTimeout(() => StateMachine.go('prompt'), 500);
+      }, 3000);
+    }
+
+    /* ============================================================
+       LOAD CSV
+       ============================================================ */
+    function loadData() {
+      return new Promise((resolve, reject) => {
+        Papa.parse('data/ess_dashboard_data.csv', {
+          download: true,
+          header: true,
+          dynamicTyping: true,
+          skipEmptyLines: true,
+          complete: (res) => {
+            APP.data = res.data;
+            // Group by system
+            const sysMap = {};
+            res.data.forEach(row => {
+              if (!sysMap[row.system_id]) {
+                sysMap[row.system_id] = {
+                  id: row.system_id,
+                  name: row.system_name,
+                  days: []
+                };
+              }
+              sysMap[row.system_id].days.push(row);
+            });
+            APP.systems = Object.values(sysMap).sort((a, b) => a.id - b.id);
+            // Dates from system 1
+            APP.dates = APP.systems[0].days.map(d => d.date);
+            APP.currentDayIdx = APP.dates.length - 1;
+            APP.selectedSystemId = APP.systems[0].id;
+            resolve();
+          },
+          error: reject
+        });
+      });
+    }
+
+    /* ============================================================
+       INIT DASHBOARD (on first entry)
+       ============================================================ */
+    let dashboardInited = false;
+    async function initDashboard() {
+      if (dashboardInited) {
+        renderAll();
+        return;
+      }
+      dashboardInited = true;
+      try {
+        if (!APP.data) await loadData();
+      } catch (e) {
+        console.error('Failed to load CSV', e);
+        return;
+      }
+      // Set scrubber range
+      const scrubber = document.getElementById('scrubber');
+      scrubber.max = APP.dates.length - 1;
+      scrubber.value = APP.currentDayIdx;
+      updateScrubberFill();
+
+      buildEssCards();
+      initPremiumChart();
+      initRadar();
+      initPremiumIndChart();
+      bindControls();
+      renderAll();
+    }
+
+    function updateScrubberFill() {
+      const s = document.getElementById('scrubber');
+      const pct = (s.value / s.max) * 100;
+      s.style.setProperty('--scrub-pct', pct + '%');
+    }
+
+    /* ============================================================
+       RENDER ALL — re-render dashboard for current day
+       ============================================================ */
+    function renderAll() {
+      const dateStr = APP.dates[APP.currentDayIdx];
+      document.getElementById('headerDate').textContent =
+        `Day ${APP.currentDayIdx + 1} of ${APP.dates.length} • ${dateStr}`;
+      document.getElementById('scrubberDate').textContent = dateStr;
+
+      if (APP.currentView === 'aggregated') {
+        renderAggregated();
+      } else {
+        renderIndividual();
+      }
+    }
+
+    function rowsForDay(idx) {
+      return APP.systems.map(sys => sys.days[idx]).filter(Boolean);
+    }
+
+    function renderAggregated() {
+      const today = rowsForDay(APP.currentDayIdx);
+      // KPI: portfolio premium / week
+      const totalPrem = today.reduce((s, r) => s + (r.premium_weekly_usd || 0), 0);
+      const avgPrem = totalPrem / today.length;
+      const avgSoh = today.reduce((s, r) => s + r.soh_pct, 0) / today.length;
+      const avgSx = today.reduce((s, r) => s + r.s_x_aggregate, 0) / today.length;
+      const avgPremLow = today.reduce((s, r) => s + r.premium_low, 0) / today.length;
+      const avgPremHigh = today.reduce((s, r) => s + r.premium_high, 0) / today.length;
+      const ciHalfWidth = (avgPremHigh - avgPremLow) / 2;
+
+      document.getElementById('kpiPortfolioVal').textContent = fmt(totalPrem);
+      document.getElementById('kpiAvgVal').textContent = fmt(avgPrem);
+      document.getElementById('kpiAvgTrend').textContent = `95% CI ±$${fmt(ciHalfWidth)}`;
+      document.getElementById('kpiRiskVal').textContent = avgSx.toFixed(2);
+      document.getElementById('kpiRiskStatus').textContent =
+        avgSx < 0.5 ? 'NORMAL' : (avgSx < 1.5 ? 'WARNING' : 'CRITICAL');
+      document.getElementById('kpiSohVal').textContent = avgSoh.toFixed(1);
+      document.getElementById('kpiSohTrend').textContent =
+        APP.currentDayIdx > 0
+          ? `${(avgSoh - rowsForDay(0).reduce((s,r)=>s+r.soh_pct,0)/today.length).toFixed(2)}pp YTD`
+          : '—';
+
+      // Trend vs yesterday
+      if (APP.currentDayIdx > 0) {
+        const yest = rowsForDay(APP.currentDayIdx - 1);
+        const totalPremYest = yest.reduce((s, r) => s + (r.premium_weekly_usd || 0), 0);
+        const delta = totalPrem - totalPremYest;
+        const sign = delta >= 0 ? '▲' : '▼';
+        const cls = delta >= 0 ? 'up' : 'down';
+        const tEl = document.getElementById('kpiPortfolioTrend');
+        tEl.className = 'kpi-trend ' + cls;
+        tEl.textContent = `${sign} $${fmt(Math.abs(delta))} vs yesterday`;
+      }
+
+      // Premium timeline chart
+      updatePremiumChart();
+      // Radar
+      renderRadar(today);
+      // Top drivers (aggregated: use mean precursor per type today)
+      renderDrivers(today, 'driversList');
+      // Counterfactual baseline
+      APP.cfBaselinePremium = totalPrem;
+      updateCounterfactual();
+    }
+
+    function renderIndividual() {
+      const today = rowsForDay(APP.currentDayIdx);
+      // Update each card
+      today.forEach(row => {
+        const card = document.getElementById('essCard-' + row.system_id);
+        if (!card) return;
+        card.querySelector('.status-pill').textContent = row.regime_status;
+        card.querySelector('.status-pill').className = 'status-pill ' + row.regime_status;
+        card.querySelector('.prem-val').textContent = '$' + fmt(row.premium_weekly_usd);
+        card.querySelector('.soh-val').textContent = row.soh_pct.toFixed(1) + '%';
+      });
+
+      // Render selected system detail
+      if (APP.selectedSystemId != null) {
+        renderSystemDetail(APP.selectedSystemId);
+      }
+    }
+
+    function fmt(v) {
+      if (v == null || isNaN(v)) return '—';
+      if (v >= 10000) return Math.round(v).toLocaleString('en-US');
+      if (v >= 100) return v.toFixed(0);
+      return v.toFixed(1);
+    }
+
+    /* ============================================================
+       PREMIUM CHART — Chart.js area chart for portfolio total
+       ============================================================ */
+    function initPremiumChart() {
+      const ctx = document.getElementById('premiumChart').getContext('2d');
+      APP.premiumChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: APP.dates,
+          datasets: [
+            {
+              label: 'Portfolio premium (USD/week)',
+              data: APP.dates.map((_, i) => sumPortfolioPremForDay(i)),
+              borderColor: '#b6d9fc',
+              backgroundColor: ctx => {
+                const grad = ctx.chart.ctx.createLinearGradient(0, 0, 0, 280);
+                grad.addColorStop(0, 'rgba(102,58,243,0.42)');
+                grad.addColorStop(1, 'rgba(102,58,243,0.02)');
+                return grad;
+              },
+              borderWidth: 1.5,
+              fill: true,
+              pointRadius: 0,
+              tension: 0.18
+            }
+          ]
+        },
+        options: chartCommonOpts({
+          xLabel: 'Date',
+          yLabel: 'Premium (USD)',
+        })
+      });
+    }
+
+    function sumPortfolioPremForDay(idx) {
+      return APP.systems.reduce((s, sys) => s + (sys.days[idx]?.premium_weekly_usd || 0), 0);
+    }
+
+    function updatePremiumChart() {
+      // Vertical line for current day
+      if (!APP.premiumChart) return;
+      // Re-bind data; tooltip showing currentDate is implicit via x position
+      APP.premiumChart.update('none');
+    }
+
+    function chartCommonOpts({xLabel, yLabel}) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(5,6,15,0.92)',
+            borderColor: 'rgba(186,217,252,0.22)',
+            borderWidth: 1,
+            titleFont: { family: "'IBM Plex Mono'", size: 11 },
+            bodyFont: { family: "'IBM Plex Mono'", size: 12 },
+            titleColor: '#d8ecf8',
+            bodyColor: '#ffffff',
+            padding: 10,
+            displayColors: false,
+            callbacks: {
+              label: (ctx) => '$' + Math.round(ctx.parsed.y).toLocaleString('en-US')
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: '#9da7ba',
+              font: { family: "'IBM Plex Mono'", size: 10 },
+              maxRotation: 0,
+              autoSkip: true,
+              maxTicksLimit: 10
+            },
+            grid: { color: 'rgba(186,217,252,0.06)' }
+          },
+          y: {
+            ticks: {
+              color: '#9da7ba',
+              font: { family: "'IBM Plex Mono'", size: 10 },
+              callback: v => '$' + v.toLocaleString('en-US')
+            },
+            grid: { color: 'rgba(186,217,252,0.06)' }
+          }
+        }
+      };
+    }
+
+    /* ============================================================
+       INDIVIDUAL: per-system mini chart
+       ============================================================ */
+    function initPremiumIndChart() {
+      const ctx = document.getElementById('premiumIndChart').getContext('2d');
+      APP.premiumIndChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: APP.dates,
+          datasets: [{
+            label: 'Premium',
+            data: [],
+            borderColor: '#b6d9fc',
+            backgroundColor: ctx => {
+              const grad = ctx.chart.ctx.createLinearGradient(0, 0, 0, 280);
+              grad.addColorStop(0, 'rgba(182,217,252,0.42)');
+              grad.addColorStop(1, 'rgba(182,217,252,0.02)');
+              return grad;
+            },
+            borderWidth: 1.5,
+            fill: true,
+            pointRadius: 0,
+            tension: 0.18,
+          }]
+        },
+        options: chartCommonOpts({})
+      });
+    }
+
+    /* ============================================================
+       RADAR — D3 5-precursor chart
+       ============================================================ */
+    const PRECURSORS = ['s_ISC', 's_thermal', 's_overcharge', 's_imbalance', 's_thermal_mag'];
+
+    function initRadar() {
+      const svg = d3.select('#radarSvg');
+      svg.selectAll('*').remove();
+      const w = svg.node().clientWidth;
+      const h = 280;
+      svg.attr('viewBox', `0 0 ${w} ${h}`);
+
+      const cx = w / 2, cy = h / 2;
+      const R = Math.min(cx, cy) - 30;
+      const angle = (i) => (Math.PI * 2 / PRECURSORS.length) * i - Math.PI / 2;
+
+      // Concentric rings
+      [0.25, 0.5, 0.75, 1.0].forEach(r => {
+        svg.append('circle')
+           .attr('cx', cx).attr('cy', cy)
+           .attr('r', R * r)
+           .attr('fill', 'none')
+           .attr('stroke', 'rgba(186,217,252,0.10)')
+           .attr('stroke-width', 0.6);
+      });
+
+      // Axes + labels
+      PRECURSORS.forEach((name, i) => {
+        const a = angle(i);
+        const x = cx + Math.cos(a) * R;
+        const y = cy + Math.sin(a) * R;
+        svg.append('line')
+           .attr('x1', cx).attr('y1', cy)
+           .attr('x2', x).attr('y2', y)
+           .attr('stroke', 'rgba(186,217,252,0.12)')
+           .attr('stroke-width', 0.6);
+        svg.append('text')
+           .attr('x', cx + Math.cos(a) * (R + 16))
+           .attr('y', cy + Math.sin(a) * (R + 16))
+           .attr('text-anchor', 'middle')
+           .attr('alignment-baseline', 'middle')
+           .attr('font-family', "'IBM Plex Mono'")
+           .attr('font-size', 11)
+           .attr('fill', '#d1e4fa')
+           .text(name);
+      });
+
+      // Polygon placeholder
+      svg.append('polygon')
+         .attr('id', 'radarPoly')
+         .attr('fill', 'rgba(102,58,243,0.32)')
+         .attr('stroke', '#b6d9fc')
+         .attr('stroke-width', 1.4);
+    }
+
+    function renderRadar(rows) {
+      const svg = d3.select('#radarSvg');
+      const w = svg.node().clientWidth;
+      const h = 280;
+      const cx = w / 2, cy = h / 2;
+      const R = Math.min(cx, cy) - 30;
+      const angle = (i) => (Math.PI * 2 / PRECURSORS.length) * i - Math.PI / 2;
+
+      // Average across systems for aggregated; clamp to [-1, 3]
+      const vals = PRECURSORS.map(p => {
+        const v = rows.reduce((s, r) => s + (r[p] || 0), 0) / rows.length;
+        return Math.max(-1, Math.min(3, v));
+      });
+      // Map to radius — z-score 0 → R*0.33, z-score 3 → R
+      const scale = (v) => ((v + 1) / 4) * R;
+      const pts = vals.map((v, i) => {
+        const a = angle(i);
+        return [cx + Math.cos(a) * scale(v), cy + Math.sin(a) * scale(v)];
+      });
+      svg.select('#radarPoly').attr('points', pts.map(p => p.join(',')).join(' '));
+    }
+
+    /* ============================================================
+       TOP DRIVERS
+       ============================================================ */
+    function renderDrivers(rows, containerId) {
+      const driverMeans = {};
+      PRECURSORS.forEach(p => {
+        driverMeans[p] = rows.reduce((s, r) => s + (r[p] || 0), 0) / rows.length;
+      });
+      const sorted = Object.entries(driverMeans)
+        .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+        .slice(0, 3);
+
+      const container = document.getElementById(containerId);
+      container.innerHTML = sorted.map(([n, v], i) => `
+        <div class="driver-row">
+          <div class="driver-rank">${i+1}.</div>
+          <div class="driver-name">${n}</div>
+          <div class="driver-value">${v >= 0 ? '+' : ''}${v.toFixed(2)}</div>
+        </div>
+      `).join('');
+    }
+
+    /* ============================================================
+       INDIVIDUAL VIEW — ESS cards
+       ============================================================ */
+    function buildEssCards() {
+      const grid = document.getElementById('essGrid');
+      grid.innerHTML = APP.systems.map(sys => `
+        <div class="ess-card" id="essCard-${sys.id}" data-id="${sys.id}">
+          <div class="id">ESS ${String(sys.id).padStart(2, '0')}</div>
+          <div class="name">${sys.name.replace(/^ESS-\d+ /, '')}</div>
+          <div class="status-pill NORMAL">NORMAL</div>
+          <div class="stat"><span>Premium / wk</span><span class="v prem-val">$—</span></div>
+          <div class="stat"><span>SOH</span><span class="v soh-val">—</span></div>
+        </div>
+      `).join('');
+      grid.querySelectorAll('.ess-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const id = parseInt(card.dataset.id);
+          APP.selectedSystemId = id;
+          document.querySelectorAll('.ess-card').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          renderSystemDetail(id);
+        });
+      });
+    }
+
+    function renderSystemDetail(sysId) {
+      const sys = APP.systems.find(s => s.id === sysId);
+      if (!sys) return;
+      const today = sys.days[APP.currentDayIdx];
+      if (!today) return;
+
+      document.getElementById('essDetail').style.display = 'block';
+      document.getElementById('detailTitle').textContent = sys.name;
+      document.getElementById('detailSub').textContent =
+        `System ID ${sys.id} • Tower A precursor-conditional pricing`;
+      const sp = document.getElementById('detailStatus');
+      sp.textContent = today.regime_status;
+      sp.className = 'status-pill ' + today.regime_status;
+
+      document.getElementById('detailPrem').textContent = fmt(today.premium_weekly_usd);
+      const ci = (today.premium_high - today.premium_low) / 2;
+      document.getElementById('detailPremCi').textContent = `95% CI ±$${fmt(ci)}`;
+      document.getElementById('detailPfire').textContent =
+        today.p_fire_7d.toExponential(2);
+      document.getElementById('detailSoh').textContent = today.soh_pct.toFixed(2);
+      document.getElementById('detailSx').textContent = today.s_x_aggregate.toFixed(2);
+      document.getElementById('detailSxStatus').textContent = today.regime_status;
+
+      // Per-system 365-day chart
+      APP.premiumIndChart.data.datasets[0].data =
+        sys.days.map(d => d.premium_weekly_usd);
+      APP.premiumIndChart.update('none');
+
+      // Drivers for this system today
+      const driverMap = {};
+      PRECURSORS.forEach(p => driverMap[p] = today[p] || 0);
+      const sorted = Object.entries(driverMap)
+        .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 3);
+      document.getElementById('detailDrivers').innerHTML = sorted.map(([n, v], i) => `
+        <div class="driver-row">
+          <div class="driver-rank">${i+1}.</div>
+          <div class="driver-name">${n}</div>
+          <div class="driver-value">${v >= 0 ? '+' : ''}${v.toFixed(2)}</div>
+        </div>`).join('');
+
+      // SOH trend
+      const sohStart = sys.days[0].soh_pct;
+      const sohDelta = today.soh_pct - sohStart;
+      document.getElementById('detailSohTrend').textContent =
+        `${sohDelta >= 0 ? '+' : ''}${sohDelta.toFixed(2)}pp YTD`;
+
+      // Recommendations
+      const recs = generateRecommendations(today);
+      document.getElementById('detailRecs').innerHTML =
+        recs.map(r => `<li>${r}</li>`).join('');
+    }
+
+    function generateRecommendations(row) {
+      const recs = [];
+      if (row.s_overcharge > 0.8) {
+        recs.push('Reduce maximum SOC envelope from current peak to 90% — projected −18% premium next week.');
+      }
+      if (row.s_thermal > 1.0 || row.temp_peak_c > 38) {
+        recs.push('Inspect thermal management system; auxiliary cooling recommended for peak summer days.');
+      }
+      if (row.s_imbalance > 1.0 || row.cell_voltage_var_mv > 3.0) {
+        recs.push('Schedule cell-balancing maintenance; voltage variance trending above fleet baseline.');
+      }
+      if (row.s_ISC > 1.2) {
+        recs.push('ISC precursor elevated — perform diagnostic cycling test within 7 days.');
+      }
+      if (row.regime_status === 'CRITICAL') {
+        recs.push('CRITICAL: notify operations and consider temporary load reduction to mitigate fire risk.');
+      }
+      if (recs.length === 0) {
+        recs.push('All precursors within nominal envelope; continue scheduled monitoring.');
+      }
+      return recs;
+    }
+
+    /* ============================================================
+       COUNTERFACTUAL
+       ============================================================ */
+    function updateCounterfactual() {
+      const cf = parseInt(document.getElementById('cfSlider').value);
+      document.getElementById('cfValue').textContent = cf;
+      document.getElementById('cfSlider').style.setProperty('--cf-pct',
+        ((cf - 80) / (98 - 80) * 100) + '%');
+      // Heuristic: each 5pp tightening of SOC max ≈ −5% premium
+      const baseline = 95;
+      const deltaPct = (baseline - cf) * 1.0; // positive when tightening below 95
+      const sign = deltaPct >= 0 ? '−' : '+';
+      const el = document.getElementById('cfDelta');
+      el.textContent = sign + Math.abs(deltaPct).toFixed(0) + '%';
+      el.className = 'delta ' + (deltaPct >= 0 ? 'down' : 'up');
+    }
+
+    /* ============================================================
+       CONTROLS BINDING
+       ============================================================ */
+    function bindControls() {
+      const scrubber = document.getElementById('scrubber');
+      scrubber.addEventListener('input', e => {
+        APP.currentDayIdx = parseInt(e.target.value);
+        updateScrubberFill();
+        renderAll();
+      });
+
+      document.getElementById('btnScrubBack').addEventListener('click', () => {
+        APP.currentDayIdx = Math.max(0, APP.currentDayIdx - 1);
+        scrubber.value = APP.currentDayIdx;
+        updateScrubberFill();
+        renderAll();
+      });
+      document.getElementById('btnScrubForward').addEventListener('click', () => {
+        APP.currentDayIdx = Math.min(APP.dates.length - 1, APP.currentDayIdx + 1);
+        scrubber.value = APP.currentDayIdx;
+        updateScrubberFill();
+        renderAll();
+      });
+      document.getElementById('btnScrubPlay').addEventListener('click', () => {
+        if (APP.playInterval) {
+          clearInterval(APP.playInterval);
+          APP.playInterval = null;
+          document.getElementById('btnScrubPlay').textContent = '▶';
+        } else {
+          document.getElementById('btnScrubPlay').textContent = '||';
+          APP.playInterval = setInterval(() => {
+            APP.currentDayIdx = (APP.currentDayIdx + 7) % APP.dates.length;
+            scrubber.value = APP.currentDayIdx;
+            updateScrubberFill();
+            renderAll();
+          }, 200);
+        }
+      });
+
+      // View toggle
+      document.getElementById('vtAggregated').addEventListener('click', () => switchView('aggregated'));
+      document.getElementById('vtIndividual').addEventListener('click', () => switchView('individual'));
+
+      // Counterfactual
+      document.getElementById('cfSlider').addEventListener('input', updateCounterfactual);
+
+      // Replay tutorial
+      document.getElementById('btnReplayTut').addEventListener('click', () => startTutorial());
+    }
+
+    function switchView(name) {
+      APP.currentView = name;
+      document.getElementById('vtAggregated').classList.toggle('active', name === 'aggregated');
+      document.getElementById('vtIndividual').classList.toggle('active', name === 'individual');
+      document.getElementById('viewAggregated').classList.toggle('active', name === 'aggregated');
+      document.getElementById('viewIndividual').classList.toggle('active', name === 'individual');
+      renderAll();
+    }
+
+    /* ============================================================
+       LOGIN
+       ============================================================ */
+    function bindLogin() {
+      const id = document.getElementById('loginId');
+      const pw = document.getElementById('loginPw');
+      const btn = document.getElementById('btnSignIn');
+      const err = document.getElementById('loginError');
+      const trySignIn = () => {
+        if (id.value.trim() === 'GAIP' && pw.value === '2026') {
+          err.classList.remove('show');
+          StateMachine.go('dashboard');
+        } else {
+          err.classList.add('show');
+          setTimeout(() => err.classList.remove('show'), 3000);
+        }
+      };
+      btn.addEventListener('click', trySignIn);
+      pw.addEventListener('keydown', e => { if (e.key === 'Enter') trySignIn(); });
+      id.addEventListener('keydown', e => { if (e.key === 'Enter') pw.focus(); });
+    }
+
+    /* ============================================================
+       TUTORIAL
+       ============================================================ */
+    const TUTORIAL_STEPS = [
+      { selector: '#loginId', state: 'login', text: 'Demo credentials are pre-filled below — enter ID = GAIP and Password = 2026, then click Sign In.', autoFill: true },
+      { selector: '#btnSignIn', state: 'login', text: 'Click here to sign in and reveal the dashboard.', autoClick: true },
+      { selector: '.kpi-grid', state: 'dashboard', text: 'Aggregated view shows fleet-level KPIs across all 5 ESS systems for today.' },
+      { selector: '#premiumChart', state: 'dashboard', text: 'Premium timeline — 365 days of portfolio premium with envelope confidence band.' },
+      { selector: '#scrubber', state: 'dashboard', text: 'Drag the scrubber or hit ▶ to watch premiums evolve day by day across the year.', autoPlay: true },
+      { selector: '#radarSvg', state: 'dashboard', text: 'Each axis is one of the 5 risk precursors expressed as a fleet-relative z-score.' },
+      { selector: '#driversList', state: 'dashboard', text: 'These three precursors are pushing premium up the most today.' },
+      { selector: '#vtIndividual', state: 'dashboard', text: 'Switch to Individual view to inspect each ESS system separately.', autoClick: true },
+      { selector: '#essGrid', state: 'dashboard', text: 'Color coded — Celestial Light = NORMAL, Amber = WARNING, Red = CRITICAL.' },
+      { selector: '#essCard-5', state: 'dashboard', text: 'Click any system to drill into its detailed risk breakdown and recommendations.', autoClick: true },
+      { selector: '#essDetail', state: 'dashboard', text: 'Tutorial complete. Explore freely or restart anytime from the top-right control.' }
+    ];
+
+    let tutStep = 0;
+    let tutAutoTimer = null;
+
+    function startTutorial() {
+      tutStep = 0;
+      // Pre-fill login if going there
+      document.getElementById('loginId').value = 'GAIP';
+      document.getElementById('loginPw').value = '2026';
+      StateMachine.go('login');
+      document.getElementById('tutorial-overlay').classList.add('active');
+      document.getElementById('tutorial-controls').style.display = 'flex';
+      runTutorialStep();
+    }
+
+    function runTutorialStep() {
+      if (tutStep >= TUTORIAL_STEPS.length) { endTutorial(); return; }
+      const step = TUTORIAL_STEPS[tutStep];
+      // Switch state if needed
+      if (step.state === 'dashboard' && document.getElementById('state-login').classList.contains('active')) {
+        StateMachine.go('dashboard');
+        // Wait for dashboard to init
+        setTimeout(() => actuallyShowStep(step), 600);
+        return;
+      }
+      actuallyShowStep(step);
+    }
+
+    function actuallyShowStep(step) {
+      const el = document.querySelector(step.selector);
+      if (!el) {
+        tutStep++;
+        return runTutorialStep();
+      }
+      const rect = el.getBoundingClientRect();
+      // Position spotlight
+      const spot = document.getElementById('tutSpotlight');
+      spot.style.display = 'block';
+      spot.style.left = (rect.left - 8) + 'px';
+      spot.style.top = (rect.top - 8) + 'px';
+      spot.style.width = (rect.width + 16) + 'px';
+      spot.style.height = (rect.height + 16) + 'px';
+      // Position finger — slightly below-right of element
+      const finger = document.getElementById('tutorial-finger');
+      finger.style.display = 'block';
+      finger.style.left = (rect.left + rect.width / 2 - 30) + 'px';
+      finger.style.top = (rect.top + rect.height / 2 - 30) + 'px';
+      // Position caption — try below first; if too low, put above
+      const caption = document.getElementById('tutorial-caption');
+      caption.style.display = 'block';
+      document.getElementById('tutStepNo').textContent = `STEP ${tutStep + 1} / ${TUTORIAL_STEPS.length}`;
+      document.getElementById('tutStepText').textContent = step.text;
+      const capW = 360;
+      const capH = 100;
+      let top = rect.bottom + 24;
+      if (top + capH > window.innerHeight - 16) top = rect.top - capH - 24;
+      let left = rect.left + rect.width / 2 - capW / 2;
+      left = Math.max(16, Math.min(left, window.innerWidth - capW - 16));
+      caption.style.left = left + 'px';
+      caption.style.top = top + 'px';
+
+      // Auto-actions
+      if (step.autoClick) {
+        setTimeout(() => {
+          if (el.click) el.click();
+        }, 4500);
+      }
+      if (step.autoPlay) {
+        setTimeout(() => document.getElementById('btnScrubPlay').click(), 1000);
+        setTimeout(() => document.getElementById('btnScrubPlay').click(), 5000);
+      }
+
+      // Auto-advance
+      if (tutAutoTimer) clearTimeout(tutAutoTimer);
+      tutAutoTimer = setTimeout(() => {
+        tutStep++;
+        runTutorialStep();
+      }, 6000);
+    }
+
+    function endTutorial() {
+      if (tutAutoTimer) clearTimeout(tutAutoTimer);
+      document.getElementById('tutorial-overlay').classList.remove('active');
+      document.getElementById('tutorial-controls').style.display = 'none';
+      document.getElementById('tutSpotlight').style.display = 'none';
+      document.getElementById('tutorial-finger').style.display = 'none';
+      document.getElementById('tutorial-caption').style.display = 'none';
+    }
+
+    /* ============================================================
+       BIND PROMPT + TUTORIAL CONTROLS
+       ============================================================ */
+    function bindPrompt() {
+      document.getElementById('btnYesTutorial').addEventListener('click', () => {
+        startTutorial();
+      });
+      document.getElementById('btnSkipTutorial').addEventListener('click', () => {
+        StateMachine.go('login');
+      });
+    }
+    function bindTutorialControls() {
+      document.getElementById('btnTutNext').addEventListener('click', () => {
+        if (tutAutoTimer) clearTimeout(tutAutoTimer);
+        tutStep++;
+        runTutorialStep();
+      });
+      document.getElementById('btnTutSkip').addEventListener('click', endTutorial);
+    }
+
+    /* ============================================================
+       BOOT
+       ============================================================ */
+    document.addEventListener('DOMContentLoaded', () => {
+      bindPrompt();
+      bindLogin();
+      bindTutorialControls();
+      runSplash();
+    });
+  </script>
+</body>
+</html>

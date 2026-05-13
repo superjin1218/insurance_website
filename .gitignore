@@ -1,0 +1,8 @@
+# Local testing artifacts (not needed for Vercel deploy)
+review_screenshots/
+test_dashboard.py
+test_dashboard_focused.py
+__pycache__/
+*.pyc
+.DS_Store
+.vercel
