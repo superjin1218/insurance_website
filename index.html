@@ -322,7 +322,9 @@
     /* ============================================================
        STATE 3 — TUTORIAL (overlay finger pointer + caption)
        NO DIM — keep dashboard fully visible. Spotlight = bright glowing
-       border only, no dark backdrop.
+       border only, no dark backdrop. Click-blocker overlay swallows all
+       interactions on the dashboard so the user cannot accidentally
+       break the tutorial flow — only the Next / Skip controls work.
        ============================================================ */
     #tutorial-overlay {
       position: fixed;
@@ -332,21 +334,63 @@
       display: none;
     }
     #tutorial-overlay.active { display: block; }
+
+    /* Transparent click-blocker — swallows pointer events without
+       dimming. Sits between dashboard (z-index < 9997) and the
+       spotlight/finger/caption (z-index 9998+). */
+    #tutorial-click-blocker {
+      position: fixed;
+      inset: 0;
+      background: transparent;
+      pointer-events: auto;
+      z-index: 9997;
+      cursor: not-allowed;
+    }
+
+    /* Pointing-hand cursor SVG — rotated so the index finger points
+       INTO the spotlit element from its bottom-right corner. */
     #tutorial-finger {
       position: fixed;
-      width: 56px;
-      height: 56px;
+      width: 64px;
+      height: 64px;
       filter: drop-shadow(0 4px 14px rgba(186,217,252,0.85))
               drop-shadow(0 0 24px rgba(102,58,243,0.55));
-      transition: top 700ms var(--ease-out), left 700ms var(--ease-out),
-                  transform 700ms var(--ease-out);
+      transition: top 700ms var(--ease-out), left 700ms var(--ease-out);
       pointer-events: none;
       z-index: 10001;
+      transform-origin: 22% 22%;  /* finger tip approx */
+    }
+    /* Inner element receives the breathing animation so the rotation
+       transform on the parent isn't overwritten. */
+    #tutorial-finger .finger-inner {
+      width: 100%;
+      height: 100%;
       animation: fingerNudge 1.4s ease-in-out infinite;
     }
     @keyframes fingerNudge {
-      0%, 100% { transform: translate(0, 0); }
-      50%      { transform: translate(0, 6px); }
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50%      { transform: translate(2px, 2px) scale(1.06); }
+    }
+
+    /* Pulsing target ring — additional eye-catcher at the spotlit
+       element's centre, on top of the spotlight border. */
+    #tutorial-target {
+      position: fixed;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: radial-gradient(circle,
+        rgba(255,255,255,0.85) 0%,
+        rgba(182,217,252,0.55) 40%,
+        transparent 70%);
+      pointer-events: none;
+      z-index: 10000;
+      transition: top 700ms var(--ease-out), left 700ms var(--ease-out);
+      animation: targetPulse 1.6s ease-in-out infinite;
+    }
+    @keyframes targetPulse {
+      0%, 100% { transform: scale(0.7); opacity: 0.7; }
+      50%      { transform: scale(1.4); opacity: 1.0; }
     }
     #tutorial-caption {
       position: fixed;
@@ -396,6 +440,78 @@
       pointer-events: auto;
     }
     .tut-btn:hover { border-color: var(--color-celestial-light); background: rgba(102,58,243,0.18); }
+    .tut-btn.primary {
+      background: var(--color-neon-violet);
+      border-color: transparent;
+      color: var(--color-ghost-white);
+      box-shadow: var(--shadow-glow-cta);
+      font-weight: 600;
+    }
+    .tut-btn.primary:hover {
+      background: #7a4cf5;
+      border-color: transparent;
+      box-shadow: rgba(238,186,247,0.42) 0 0 18px,
+                  rgba(102,58,243,0.32) 0 6px 16px;
+    }
+    /* Progress dots in caption */
+    #tutorial-caption .step-progress .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(186,217,252,0.20);
+      transition: background var(--duration-quick);
+    }
+    #tutorial-caption .step-progress .dot.done {
+      background: var(--color-celestial-light);
+    }
+    #tutorial-caption .step-progress .dot.current {
+      background: var(--color-neon-violet);
+      box-shadow: 0 0 8px rgba(102,58,243,0.65);
+    }
+
+    /* Tutorial-end toast — appears centered when tutorial ends */
+    #tutorial-end-toast {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -40%) scale(0.92);
+      opacity: 0;
+      display: none;
+      align-items: center;
+      gap: 16px;
+      padding: 20px 28px;
+      background: linear-gradient(180deg, rgba(17,20,42,0.97) 0%, rgba(10,12,26,0.97) 100%);
+      border: 1px solid var(--color-celestial-light);
+      border-radius: var(--radius-md);
+      box-shadow:
+        0 0 0 1px rgba(186,217,252,0.18),
+        0 24px 60px rgba(0,0,0,0.55),
+        0 0 60px rgba(186,217,252,0.45);
+      backdrop-filter: blur(20px);
+      z-index: 10003;
+      pointer-events: none;
+      transition: opacity 380ms var(--ease-out),
+                  transform 380ms var(--ease-out);
+      max-width: 480px;
+    }
+    #tutorial-end-toast.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    #tutorial-end-toast .toast-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--color-ghost-white);
+      letter-spacing: -0.005em;
+    }
+    #tutorial-end-toast .toast-sub {
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--color-arctic-mist);
+      margin-top: 4px;
+      line-height: 1.4;
+    }
     /* Spotlight: only a glowing border + soft outer halo. NO dark
        backdrop — the dashboard remains fully readable underneath. */
     .tut-spotlight {
@@ -1302,19 +1418,51 @@
 
   <!-- Tutorial overlay (no dim — dashboard stays fully visible) -->
   <div id="tutorial-overlay">
+    <!-- Transparent click-blocker — dashboard cannot receive any user input
+         while the tutorial is active; only the controls below work. -->
+    <div id="tutorial-click-blocker" style="display:none;"></div>
+
+    <!-- Glowing border around the active step's element -->
     <div class="tut-spotlight" id="tutSpotlight" style="display:none;"></div>
-    <svg id="tutorial-finger" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="display:none;">
-      <path d="M32 4C20 4 14 14 14 22v18l-4-2c-3-1-6 1-6 4 0 1 0 2 1 3l10 14c2 3 6 5 10 5h12c8 0 14-6 14-14V22c0-8-6-18-19-18z"
-            fill="rgba(216,236,248,0.95)" stroke="rgba(102,58,243,0.85)" stroke-width="1.5" />
-    </svg>
+
+    <!-- Pulsing target ring at element centre for unambiguous focus -->
+    <div id="tutorial-target" style="display:none;"></div>
+
+    <!-- Pointing-hand cursor (Material Icons "touch_app" style — clear
+         index-finger silhouette). Default rotation 0; positioning JS
+         applies side-specific rotation so the finger always points INTO
+         the spotlit element. -->
+    <div id="tutorial-finger" style="display:none;">
+      <div class="finger-inner">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+          <path fill="rgba(216,236,248,0.98)" stroke="rgba(102,58,243,0.95)" stroke-width="0.8"
+                d="M9 11.24V7.5C9 6.12 10.12 5 11.5 5S14 6.12 14 7.5v3.74c1.21-.81 2-2.18 2-3.74C16 5.01 13.99 3 11.5 3S7 5.01 7 7.5c0 1.56.79 2.93 2 3.74zm9.84 4.63l-4.54-2.26c-.17-.07-.35-.11-.54-.11H13v-6c0-.83-.67-1.5-1.5-1.5S10 6.67 10 7.5v10.74c-3.6-.76-3.54-.75-3.67-.75-.31 0-.59.13-.79.33l-.79.8 4.94 4.94c.27.27.65.44 1.06.44h6.79c.75 0 1.33-.55 1.44-1.28l.75-5.27c.01-.07.02-.14.02-.2 0-.62-.38-1.16-.91-1.38z"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Caption box with step number + instruction text -->
     <div id="tutorial-caption" style="display:none;">
       <div class="step-no" id="tutStepNo">STEP 1</div>
       <div class="step-text" id="tutStepText">—</div>
+      <div class="step-progress" id="tutStepProgress" style="display:flex; gap:4px; margin-top:12px;"></div>
     </div>
   </div>
   <div id="tutorial-controls" style="display:none;">
-    <button class="tut-btn" id="btnTutNext">Next →</button>
+    <button class="tut-btn primary" id="btnTutNext">Next →</button>
     <button class="tut-btn" id="btnTutSkip">Skip Tutorial</button>
+  </div>
+
+  <!-- Tutorial completion toast (shown briefly when tutorial ends) -->
+  <div id="tutorial-end-toast">
+    <svg viewBox="0 0 24 24" width="28" height="28" style="flex-shrink:0;">
+      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
+            fill="#b6d9fc" />
+    </svg>
+    <div>
+      <div class="toast-title">Tutorial End</div>
+      <div class="toast-sub">Explore the dashboard freely — restart anytime via ↻ Tutorial.</div>
+    </div>
   </div>
 
   <script>
@@ -1999,82 +2147,130 @@
     }
 
     /* ============================================================
-       TUTORIAL
+       TUTORIAL — manual advance, click-blocker, action-on-Next
        ============================================================ */
     const TUTORIAL_STEPS = [
-      { selector: '#loginId', state: 'login', text: 'Demo credentials are pre-filled below — enter ID = GAIP and Password = 2026, then click Sign In.', autoFill: true },
-      { selector: '#btnSignIn', state: 'login', text: 'Click here to sign in and reveal the dashboard.', autoClick: true },
-      { selector: '.kpi-grid', state: 'dashboard', text: 'Aggregated view shows fleet-level KPIs across all 5 ESS systems for today.' },
-      { selector: '#premiumChart', state: 'dashboard', text: 'Premium timeline — 365 days of portfolio premium with envelope confidence band.' },
-      { selector: '#scrubber', state: 'dashboard', text: 'Drag the scrubber or hit ▶ to watch premiums evolve day by day across the year.', autoPlay: true },
-      { selector: '#radarSvg', state: 'dashboard', text: 'Each axis is one of the 5 risk precursors expressed as a fleet-relative z-score.' },
-      { selector: '#driversList', state: 'dashboard', text: 'These three precursors are pushing premium up the most today.' },
-      { selector: '#vtIndividual', state: 'dashboard', text: 'Switch to Individual view to inspect each ESS system separately.', autoClick: true },
-      { selector: '#essGrid', state: 'dashboard', text: 'Color coded — Celestial Light = NORMAL, Amber = WARNING, Red = CRITICAL.' },
-      { selector: '#essCard-5', state: 'dashboard', text: 'Click any system to drill into its detailed risk breakdown and recommendations.', autoClick: true },
-      { selector: '#essDetail', state: 'dashboard', text: 'Tutorial complete. Explore freely or restart anytime from the top-right control.' }
+      {
+        selector: '#loginId', state: 'login',
+        text: 'Demo credentials are pre-filled — ID = GAIP, Password = 2026. Click Next to continue.',
+      },
+      {
+        selector: '#btnSignIn', state: 'login',
+        text: 'Click Next to sign in and reveal the insurance command center.',
+        actionOnNext: () => document.getElementById('btnSignIn').click(),
+        nextStateAfter: 'dashboard',
+      },
+      {
+        selector: '#kpiPortfolioPrem', state: 'dashboard',
+        text: 'TODAY\'S PORTFOLIO PREMIUM — total weekly premium across all 5 ESS systems for the selected day.',
+      },
+      {
+        selector: '.kpi-grid', state: 'dashboard',
+        text: 'These 4 KPI cards summarise fleet-level metrics: portfolio premium, average per system, fleet aggregate risk, and average state of health.',
+      },
+      {
+        selector: '#premiumChart', state: 'dashboard',
+        text: 'PREMIUM TIMELINE — 365 days of daily portfolio premium. Click Daily / Weekly / Monthly to re-aggregate the view.',
+      },
+      {
+        selector: '.scrubber-row', state: 'dashboard',
+        text: 'DATE SCRUBBER — drag or press ▶ to play the year and watch premiums respond to the underlying risk profile day by day.',
+      },
+      {
+        selector: '#radarSvg', state: 'dashboard',
+        text: '5-PRECURSOR RADAR — each axis is one of the 5 physical risk signals (s_ISC, s_thermal, s_overcharge, s_imbalance, s_thermal_mag) as a fleet-relative z-score.',
+      },
+      {
+        selector: '#driversList', state: 'dashboard',
+        text: 'TOP 3 DRIVERS — the precursors contributing most to today\'s premium. Operators can target these for risk mitigation.',
+      },
+      {
+        selector: '#vtIndividual', state: 'dashboard',
+        text: 'Click Next to switch to the Individual view and inspect each ESS system separately.',
+        actionOnNext: () => document.getElementById('vtIndividual').click(),
+      },
+      {
+        selector: '#essGrid', state: 'dashboard',
+        text: 'INDIVIDUAL ESS — 5 systems color-coded by status: light blue NORMAL, amber WARNING, red CRITICAL with a soft pulse glow.',
+      },
+      {
+        selector: '#essCard-5', state: 'dashboard',
+        text: 'ESS-05 is in CRITICAL state. Click Next to drill into its detailed risk breakdown.',
+        actionOnNext: () => document.getElementById('essCard-5').click(),
+      },
+      {
+        selector: '#essDetail', state: 'dashboard',
+        text: 'PER-SYSTEM DETAIL — premium history, risk drivers, and auto-generated maintenance recommendations. Tutorial complete — press Next to close.',
+      },
     ];
 
     let tutStep = 0;
-    let tutAutoTimer = null;
+    let resizeHandler = null;
 
     function startTutorial() {
       tutStep = 0;
-      // Pre-fill login if going there
       document.getElementById('loginId').value = 'GAIP';
       document.getElementById('loginPw').value = '2026';
       StateMachine.go('login');
       document.getElementById('tutorial-overlay').classList.add('active');
       document.getElementById('tutorial-controls').style.display = 'flex';
+      document.getElementById('tutorial-click-blocker').style.display = 'block';
+      // Re-position on viewport resize so spotlight stays attached
+      resizeHandler = () => repositionCurrentStep();
+      window.addEventListener('resize', resizeHandler);
       runTutorialStep();
     }
 
     function runTutorialStep() {
       if (tutStep >= TUTORIAL_STEPS.length) { endTutorial(); return; }
       const step = TUTORIAL_STEPS[tutStep];
-      // Switch state if needed
-      if (step.state === 'dashboard' && document.getElementById('state-login').classList.contains('active')) {
+      // Switch state if needed (for first dashboard step after login)
+      const needsDashboard = step.state === 'dashboard'
+        && document.getElementById('state-login').classList.contains('active');
+      if (needsDashboard) {
         StateMachine.go('dashboard');
-        // Wait for dashboard to init
-        setTimeout(() => actuallyShowStep(step), 600);
+        setTimeout(() => prepareAndShow(step), 700);
         return;
       }
-      actuallyShowStep(step);
+      prepareAndShow(step);
     }
 
-    function actuallyShowStep(step) {
+    function prepareAndShow(step) {
       const el = document.querySelector(step.selector);
-      if (!el) {
-        tutStep++;
-        return runTutorialStep();
-      }
+      if (!el) { tutStep++; return runTutorialStep(); }
       // Auto-scroll the dashboard scroller so the target sits in the
-      // middle 50% of the viewport. Always scroll, even if it's already
-      // visible — some elements need to be fully centred for the caption
-      // to fit below them.
+      // upper-middle of viewport BEFORE positioning spotlight.
       const dashScroller = document.getElementById('state-dashboard');
       const isInDashboard = dashScroller && dashScroller.contains(el);
       if (isInDashboard) {
         const rect0 = el.getBoundingClientRect();
-        const desiredCentre = window.innerHeight * 0.42;  // upper-middle
+        const desiredCentre = window.innerHeight * 0.40;
         const elementCentre = rect0.top + rect0.height / 2;
         const scrollDelta = elementCentre - desiredCentre;
-        dashScroller.scrollBy({ top: scrollDelta, behavior: 'smooth' });
+        if (Math.abs(scrollDelta) > 4) {
+          dashScroller.scrollBy({ top: scrollDelta, behavior: 'smooth' });
+          setTimeout(() => positionOverlay(el, step), 700);
+        } else {
+          positionOverlay(el, step);
+        }
       } else {
-        // Login / prompt cards aren't in scrollable container — fallback
-        // to standard scrollIntoView in case they ever exceed viewport
-        try {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } catch (_) { /* IE11 etc. — silent */ }
+        try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+        catch (_) {}
+        setTimeout(() => positionOverlay(el, step), 400);
       }
+    }
 
-      // Wait for the smooth-scroll to settle before measuring final rect.
-      setTimeout(() => positionOverlay(el, step), 720);
+    function repositionCurrentStep() {
+      const step = TUTORIAL_STEPS[tutStep];
+      if (!step) return;
+      const el = document.querySelector(step.selector);
+      if (el) positionOverlay(el, step);
     }
 
     function positionOverlay(el, step) {
       const rect = el.getBoundingClientRect();
-      // Position spotlight (fixed positioning — uses viewport coords)
+
+      // Spotlight border
       const spot = document.getElementById('tutSpotlight');
       spot.style.display = 'block';
       spot.style.left = (rect.left - 8) + 'px';
@@ -2082,67 +2278,147 @@
       spot.style.width = (rect.width + 16) + 'px';
       spot.style.height = (rect.height + 16) + 'px';
 
-      // Position finger — slightly below-right of element centre
+      // Pulsing target ring at element centre
+      const target = document.getElementById('tutorial-target');
+      target.style.display = 'block';
+      target.style.left = (rect.left + rect.width / 2 - 20) + 'px';
+      target.style.top  = (rect.top  + rect.height / 2 - 20) + 'px';
+
+      // Pointing finger — choose corner with most room outside element
       const finger = document.getElementById('tutorial-finger');
       finger.style.display = 'block';
-      const fingerLeft = Math.max(8,
-        Math.min(window.innerWidth - 64,
-                 rect.left + rect.width / 2 - 28));
-      const fingerTop = Math.max(8,
-        Math.min(window.innerHeight - 64,
-                 rect.top + rect.height / 2 - 28));
-      finger.style.left = fingerLeft + 'px';
-      finger.style.top = fingerTop + 'px';
+      const placement = pickFingerPlacement(rect);
+      finger.style.left = placement.left + 'px';
+      finger.style.top  = placement.top + 'px';
+      finger.style.transform = `rotate(${placement.rotate}deg)`;
 
-      // Position caption — try below first; if too low, put above; if both
-      // would overlap the element, sidestep to right edge
+      // Caption box — prefer below, fallback above, fallback right
       const caption = document.getElementById('tutorial-caption');
       caption.style.display = 'block';
       document.getElementById('tutStepNo').textContent =
         `STEP ${tutStep + 1} / ${TUTORIAL_STEPS.length}`;
       document.getElementById('tutStepText').textContent = step.text;
-      const capW = 380;
-      const capH = 120;
+      // Progress dots
+      const prog = document.getElementById('tutStepProgress');
+      prog.innerHTML = TUTORIAL_STEPS.map((_, i) => {
+        const cls = i === tutStep ? 'current' : (i < tutStep ? 'done' : '');
+        return `<span class="dot ${cls}"></span>`;
+      }).join('');
+
+      const capW = 400;
+      const capH = 150;
+      const margin = 24;
       let top = rect.bottom + 28;
-      if (top + capH > window.innerHeight - 24) {
+      let left = rect.left + rect.width / 2 - capW / 2;
+      if (top + capH > window.innerHeight - margin) {
         top = rect.top - capH - 28;
-        if (top < 24) {
-          // Element fills viewport vertically — pin caption to bottom
-          top = window.innerHeight - capH - 24;
+      }
+      if (top < margin) {
+        // Sidestep to the right of element if it doesn't fit above/below
+        top = Math.max(margin, Math.min(window.innerHeight - capH - margin,
+                                        rect.top));
+        left = rect.right + 28;
+        if (left + capW > window.innerWidth - margin) {
+          left = rect.left - capW - 28;
         }
       }
-      let left = rect.left + rect.width / 2 - capW / 2;
-      left = Math.max(24, Math.min(left, window.innerWidth - capW - 24));
+      left = Math.max(margin, Math.min(left, window.innerWidth - capW - margin));
       caption.style.left = left + 'px';
       caption.style.top = top + 'px';
 
-      // Auto-actions
-      if (step.autoFill && el.tagName === 'INPUT') {
-        // (login fields are pre-filled at startTutorial, nothing to do)
-      }
-      if (step.autoClick) {
-        setTimeout(() => { if (el.click) el.click(); }, 4500);
-      }
-      if (step.autoPlay) {
-        setTimeout(() => document.getElementById('btnScrubPlay').click(), 1000);
-        setTimeout(() => document.getElementById('btnScrubPlay').click(), 5000);
-      }
+      // Last step: switch Next → "Finish ✓" and Skip → "End Tutorial"
+      const nextBtn = document.getElementById('btnTutNext');
+      const skipBtn = document.getElementById('btnTutSkip');
+      const isLast = tutStep === TUTORIAL_STEPS.length - 1;
+      nextBtn.textContent = isLast ? 'Finish ✓' : 'Next →';
+      skipBtn.textContent = isLast ? 'End Tutorial' : 'Skip Tutorial';
 
-      // Auto-advance after 6.5s
-      if (tutAutoTimer) clearTimeout(tutAutoTimer);
-      tutAutoTimer = setTimeout(() => {
-        tutStep++;
+      // Side-effect demos (autoPlay scrubber wiggle) — visual only,
+      // doesn't advance the step.
+      if (step.demoPlay) {
+        setTimeout(() => document.getElementById('btnScrubPlay').click(), 600);
+        setTimeout(() => document.getElementById('btnScrubPlay').click(), 4000);
+      }
+    }
+
+    /**
+     * Choose which corner / side to place the pointing finger.
+     * Strategy: prefer bottom-right corner (finger comes from below-right
+     * pointing up-into element). Fall back to top-right / bottom-left /
+     * top-left depending on viewport space. Returns {left, top, rotate}.
+     */
+    function pickFingerPlacement(rect) {
+      const FW = 64;  // finger width
+      const PAD = 6;  // overlap into element so fingertip is INSIDE spotlight
+      const margin = 12;
+      // Default: bottom-right (finger pointing up-and-left)
+      const cands = [
+        { side: 'br', left: rect.right - PAD,        top: rect.bottom - PAD,        rotate: -45 },
+        { side: 'bl', left: rect.left  - FW + PAD,   top: rect.bottom - PAD,        rotate: 45 },
+        { side: 'tr', left: rect.right - PAD,        top: rect.top  - FW + PAD,     rotate: -135 },
+        { side: 'tl', left: rect.left  - FW + PAD,   top: rect.top  - FW + PAD,     rotate: 135 },
+      ];
+      for (const c of cands) {
+        if (c.left >= margin && c.left + FW <= window.innerWidth - margin
+            && c.top >= margin && c.top + FW <= window.innerHeight - margin) {
+          return c;
+        }
+      }
+      // Fallback — clamp the default
+      return {
+        left: Math.max(margin, Math.min(window.innerWidth - FW - margin, cands[0].left)),
+        top:  Math.max(margin, Math.min(window.innerHeight - FW - margin, cands[0].top)),
+        rotate: cands[0].rotate,
+      };
+    }
+
+    function nextTutStep() {
+      const step = TUTORIAL_STEPS[tutStep];
+      if (step && step.actionOnNext) {
+        try { step.actionOnNext(); } catch (e) { console.warn(e); }
+      }
+      tutStep++;
+      // For the Sign In step, the dashboard needs a beat to render
+      const needsDelay = step && step.nextStateAfter === 'dashboard';
+      if (needsDelay) {
+        setTimeout(runTutorialStep, 800);
+      } else {
         runTutorialStep();
-      }, 6500);
+      }
     }
 
     function endTutorial() {
-      if (tutAutoTimer) clearTimeout(tutAutoTimer);
-      document.getElementById('tutorial-overlay').classList.remove('active');
+      if (resizeHandler) {
+        window.removeEventListener('resize', resizeHandler);
+        resizeHandler = null;
+      }
+      // Hide tutorial chrome immediately
       document.getElementById('tutorial-controls').style.display = 'none';
       document.getElementById('tutSpotlight').style.display = 'none';
+      document.getElementById('tutorial-target').style.display = 'none';
       document.getElementById('tutorial-finger').style.display = 'none';
       document.getElementById('tutorial-caption').style.display = 'none';
+      // Reset Skip button label for next time
+      document.getElementById('btnTutSkip').textContent = 'Skip Tutorial';
+
+      // Show "Tutorial End" toast for ~1.6s before fully releasing the
+      // click-blocker — gives a clear visual confirmation that the
+      // walkthrough finished. Click-blocker stays up briefly so the
+      // toast itself is the primary visual.
+      const toast = document.getElementById('tutorial-end-toast');
+      toast.style.display = 'flex';
+      // Force reflow so the transition kicks in
+      void toast.offsetWidth;
+      toast.classList.add('show');
+
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => {
+          toast.style.display = 'none';
+          document.getElementById('tutorial-overlay').classList.remove('active');
+          document.getElementById('tutorial-click-blocker').style.display = 'none';
+        }, 400);
+      }, 1600);
     }
 
     /* ============================================================
@@ -2157,11 +2433,7 @@
       });
     }
     function bindTutorialControls() {
-      document.getElementById('btnTutNext').addEventListener('click', () => {
-        if (tutAutoTimer) clearTimeout(tutAutoTimer);
-        tutStep++;
-        runTutorialStep();
-      });
+      document.getElementById('btnTutNext').addEventListener('click', nextTutStep);
       document.getElementById('btnTutSkip').addEventListener('click', endTutorial);
     }
 
